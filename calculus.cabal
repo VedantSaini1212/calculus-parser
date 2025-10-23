@@ -1,0 +1,51 @@
+cabal-version:      3.0
+-- The name of the package.
+name:               calculus
+
+-- The package version.
+-- See the Haskell package versioning policy (PVP) for standards
+-- guiding when and how versions should be incremented.
+-- https://pvp.haskell.org
+-- PVP summary:     +-+------- breaking API changes
+--                  | | +----- non-breaking API additions
+--                  | | | +--- code changes with no API change
+version:            0.1.0.0
+
+synopsis:           Lab #5 - Symbolic Differentiation
+description:        An exercise to provide experience with using data types and type classes in Haskell.
+
+author:             Imperial College London
+maintainer:         j.willis19@imperial.ac.uk
+build-type:         Simple
+
+common common-settings
+    -- Options to pass to GHC, in this case, we want to turn on warnings
+    ghc-options: -Wtabs -Wunused-binds -Wincomplete-patterns -Wmissing-signatures -Wno-missing-methods
+    -- Base language which the package is written in.
+    default-language: GHC2021
+    -- The range of GHC base library verisons that are supported
+    build-depends:    base >=4.13 && <5,
+                      containers
+
+library
+    import:           common-settings
+    -- Modules exported by the library.
+    exposed-modules:  Calculus, Expr
+    -- Directories containing source files.
+    hs-source-dirs:   src
+
+common test-common
+    import:           common-settings
+    -- Directories containing source files.
+    hs-source-dirs:   test
+    build-depends:    calculus,
+                      tasty >=1.1 && <1.6
+
+test-suite calculus-test
+    import:           test-common
+    -- The interface type and version of the test suite.
+    type:             exitcode-stdio-1.0
+    -- The entrypoint to the test suite.
+    main-is:          Tests.hs
+    other-modules:    IC.Approx, IC.Exact
+    build-depends:    tasty-hunit >=0.9 && <0.11
