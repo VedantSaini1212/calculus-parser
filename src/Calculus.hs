@@ -11,6 +11,8 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Base (VecElem(DoubleElemRep))
 import GHC.Float (fromRat, int2Double)
+import Data.Bits (Bits(xor))
+import Data.String (IsString(fromString))
 
 type Env = Map String Double
 
@@ -20,17 +22,30 @@ type Env = Map String Double
 instance Num Expr where
   fromInteger :: Integer -> Expr
   fromInteger n = Val (fromInteger n)
-  negate      :: Expr -> Expr
-  negate      = Pre Neg
-  (+), (*)    :: Expr -> Expr -> Expr
-  (+)         = Bin Add
-  (*)         = Bin Mul
+
+  negate :: Expr -> Expr
+  negate (Val 0) = 0
+  negate e = Pre Neg e
+
+  (*) :: Expr -> Expr -> Expr
+  Val 0 * _ = 0
+  _ * Val 0 = 0
+  Val 1 * e = e
+  e * Val 1 = e 
+  e1 * e2 = Bin Mul e1 e2
+
+  (+) :: Expr -> Expr -> Expr
+  Val 0 + e = e
+  e + Val 0 = e
+  e1 + e2 = Bin Add e1 e2
 
 instance Fractional Expr where
   fromRational :: Rational -> Expr
   fromRational n = Val (fromRational n)
-  (/)          :: Expr -> Expr -> Expr
-  (/)          = Bin Div
+  (/) :: Expr -> Expr -> Expr
+  Val 0 / e = 0
+  e / Val 1 = e
+  e1/e2 = Bin Div e1 e2
 
 instance Floating Expr where
   sin, cos, log, exp :: Expr -> Expr
@@ -83,7 +98,19 @@ eval maps (Pre op e) = f (eval maps e) where f = preOps ! op
 Pretty prints an expression to a more human-readable form.
 -}
 pretty :: Expr -> String
-pretty = show
+pretty (Val x) = show x
+pretty (Id x) =  x 
+pretty (Bin Add e1 (Pre Neg e2)) = "(" ++ pretty e1 ++ "-" ++ pretty e2 ++ ")"
+pretty (Bin Add e1 e2) = "(" ++ pretty e1 ++ "+" ++ pretty e2 ++ ")"
+pretty (Bin Mul e1 e2) = "(" ++ pretty e1 ++ "*" ++ pretty e2 ++ ")"
+pretty (Bin Div e1 e2) = "(" ++ pretty e1 ++ "/" ++ pretty e2 ++ ")"
+pretty (Pre Neg e) = "-(" ++ pretty e ++ ")"
+pretty (Pre Sin e) = "sin(" ++ pretty e ++ ")"
+pretty (Pre Cos e) = "cos(" ++ pretty e ++ ")"
+pretty (Pre Log e) = "log(" ++ pretty e ++ ")"
+pretty (Pre Exp e) = "e^" ++ pretty e 
+
+
 
 {-|
 Symbolically differentiates a term with respect to a given identifier.
@@ -96,12 +123,11 @@ diff _ (Val _) = Val 0
 diff x (Bin Add e1 e2) = diff x e1 + diff x e2
 diff x (Bin Mul e1 e2) = e1 * diff x e2  + diff x e1 * e2
 diff x (Bin Div e1 e2) = (diff x e1 * e2 - e1 * diff x e2 ) / (e2 ^ 2)
-diff x (Pre Sin expr) = cos expr * diff x expr
-diff x (Pre Cos expr) = -(sin expr * diff x expr)
-diff x (Pre Log expr) = diff x expr / expr
-diff x (Pre Exp (Id var)) = if x == var then exp (Id var) else Val 0
-diff x (Pre Exp expr) = diff x expr * exp expr
-diff x (Pre Neg expr) = -(diff x expr)
+diff x (Pre Sin e) = cos e * diff x e
+diff x (Pre Cos e) = -(sin e * diff x e)
+diff x (Pre Log e) = diff x e / e
+diff x (Pre Exp e) = diff x e * exp e
+diff x (Pre Neg e) = -(diff x e)
 
 
 {-|
@@ -116,10 +142,10 @@ maclaurin expr x n
   | vars expr /= Set.singleton "x" = Nothing
   | otherwise = Just (sumTo n rest)
     where
-      rest = zipWith (/) (zipWith (*) fs xs) facs
+      rest = zipWith3 (\f i k -> f * (x ** i) / k)
+                fs [0..] facs
         where
           fs = map (eval (Map.fromList [("x", 0)])) (iterate (diff "x") expr)
-          xs = [x^m | m <- [0..]]
           facs = scanl (*) 1 [1..]
 
 -- Recursive method
@@ -138,22 +164,25 @@ maclaurin expr x n
 -- Extension
 instance Num a => Num [a] where
   fromInteger  :: Integer -> [a]
-  fromInteger  = undefined
+  fromInteger x = repeat (fromInteger x)
   negate       :: [a] -> [a]
-  negate       = undefined
-  (+), (*)     :: [a] -> [a] -> [a]
-  (+)          = undefined
-  (*)          = undefined
-
+  negate       = map negate 
+  (+),(*) :: [a] -> [a] -> [a]
+  (+) = zipWith (+) 
+  (*) = zipWith (*)
+  
 instance Fractional a => Fractional [a] where
   fromRational :: Rational -> [a]
-  fromRational = undefined
+  fromRational x = repeat (fromRational x)
   (/)          :: [a] -> [a] -> [a]
-  (/)          = undefined
+  (/)          = zipWith (/)
 
 instance Floating a => Floating [a] where
   (**)         :: [a] -> [a] -> [a]
-  (**)         = undefined
+  (**)         = zipWith (**)
 
 pi :: (Enum a, Fractional a) => Int -> a
-pi = undefined
+pi n = sumTo n (zipWith (/) num den)
+  where
+    num = cycle [4,-4]
+    den = enumFromThen 1 3
