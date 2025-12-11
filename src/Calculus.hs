@@ -9,10 +9,6 @@ import Data.Map qualified as Map
 
 import Data.Set (Set)
 import Data.Set qualified as Set
-import GHC.Base (VecElem(DoubleElemRep))
-import GHC.Float (fromRat, int2Double)
-import Data.Bits (Bits(xor))
-import Data.String (IsString(fromString))
 
 type Env = Map String Double
 
@@ -21,7 +17,7 @@ type Env = Map String Double
 
 instance Num Expr where
   fromInteger :: Integer -> Expr
-  fromInteger n = Val (fromInteger n)
+  fromInteger = Val . fromInteger 
 
   negate :: Expr -> Expr
   negate (Val 0) = 0
@@ -41,7 +37,7 @@ instance Num Expr where
 
 instance Fractional Expr where
   fromRational :: Rational -> Expr
-  fromRational n = Val (fromRational n)
+  fromRational = Val . fromRational
   (/) :: Expr -> Expr -> Expr
   Val 0 / e = 0
   e / Val 1 = e
@@ -97,19 +93,27 @@ eval maps (Pre op e) = f (eval maps e) where f = preOps ! op
 {-| OPTIONAL
 Pretty prints an expression to a more human-readable form.
 -}
+preSymbol :: PreOp -> String
+preSymbol Sin = "sin"
+preSymbol Cos = "cos"
+preSymbol Log = "log"
+preSymbol Exp = "e^"
+preSymbol _ = "-"
+binSymbol :: BinOp -> String
+binSymbol Add = "+"
+binSymbol Mul = "*"
+binSymbol Div = "/"
+
 pretty :: Expr -> String
 pretty (Val x) = show x
-pretty (Id x) =  x 
-pretty (Bin Add e1 (Pre Neg e2)) = "(" ++ pretty e1 ++ "-" ++ pretty e2 ++ ")"
-pretty (Bin Add e1 e2) = "(" ++ pretty e1 ++ "+" ++ pretty e2 ++ ")"
-pretty (Bin Mul e1 e2) = "(" ++ pretty e1 ++ "*" ++ pretty e2 ++ ")"
-pretty (Bin Div e1 e2) = "(" ++ pretty e1 ++ "/" ++ pretty e2 ++ ")"
+pretty (Id x)  = x
+pretty (Bin Add e1 (Pre Neg e2)) =
+    "(" ++ pretty e1 ++ "-" ++ pretty e2 ++ ")"
+pretty (Bin op e1 e2) =
+    "(" ++ pretty e1 ++ binSymbol op ++ pretty e2 ++ ")"
 pretty (Pre Neg e) = "-(" ++ pretty e ++ ")"
-pretty (Pre Sin e) = "sin(" ++ pretty e ++ ")"
-pretty (Pre Cos e) = "cos(" ++ pretty e ++ ")"
-pretty (Pre Log e) = "log(" ++ pretty e ++ ")"
-pretty (Pre Exp e) = "e^" ++ pretty e 
-
+pretty (Pre op e) =
+    preSymbol op ++ "(" ++ pretty e ++ ")"
 
 
 {-|
