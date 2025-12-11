@@ -31,7 +31,7 @@ maclaurin (exp (Id "x")) 1 10
 -- Pretty print
 pretty expr
 -- Output: "((x*x)+(3*x)+5)"
-```
 
 -- Pi approximation with 1000 terms
 pi 1000
+```
